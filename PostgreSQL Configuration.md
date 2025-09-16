@@ -255,7 +255,7 @@ WHERE name = 'shared_buffers';
    
 3. ค่า  pending_restart ในผลการทดลองมีค่าเป็นอย่างไร และมีความหมายอย่างไร
     ตอบ ค่า pending_restart = f (false) หมายความว่า ไม่จำเป็นต้อง restart PostgreSQL เพื่อให้ค่าการตั้งค่านี้มีผล เพราะค่าถูกโหลดแล้วจากไฟล์ config
-    
+ ```   
 -- คำนวณและตั้งค่าใหม่
 -- สำหรับระบบ 2GB: 512MB (25%)
 ALTER SYSTEM SET shared_buffers = '512MB';
@@ -265,17 +265,18 @@ select pg_reload_conf();
 SELECT name, setting, unit, source, pending_restart
 FROM pg_settings 
 WHERE name = 'shared_buffers';
-
 ```
 -- ออกจาก postgres prompt (กด \q แล้ว enter) ทำการ Restart PostgreSQL ด้วยคำสั่ง แล้ว run docker อีกครั้ง หรือใช้วิธีการ stop และ run containner
 docker exec -it -u postgres postgres-config pg_ctl restart -D /var/lib/postgresql/data -m fast
 
 ### ผลการทดลอง
-```
-รูปผลการเปลี่ยนแปลงค่า pending_restart
-รูปหลังจาก restart postgres
 
-```
+รูปผลการเปลี่ยนแปลงค่า pending_restart
+<img width="822" height="230" alt="image" src="https://github.com/user-attachments/assets/6676d971-b9c3-4ce5-9398-7f2bbb8d5298" />
+
+รูปหลังจาก restart postgres
+<img width="857" height="318" alt="image" src="https://github.com/user-attachments/assets/b7f50bce-13b6-420c-a4b9-e64ca2414f5f" />
+
 
 #### 2.2 ปรับแต่ง Work Memory (ไม่ต้อง restart)
 ```sql
@@ -296,9 +297,10 @@ FROM pg_settings
 WHERE name = 'work_mem';
 ```
 ### ผลการทดลอง
-```
+
 รูปผลการเปลี่ยนแปลงค่า work_mem
-```
+<img width="546" height="214" alt="image" src="https://github.com/user-attachments/assets/43ff46d3-9b2a-4eb0-92ea-44ac72801059" />
+
 
 #### 3.3 ปรับแต่ง Maintenance Work Memory
 ```sql
@@ -313,9 +315,10 @@ SELECT pg_reload_conf();
 SHOW maintenance_work_mem;
 ```
 ### ผลการทดลอง
-```
+
 รูปผลการเปลี่ยนแปลงค่า maintenance_work_mem
-```
+<img width="421" height="148" alt="image" src="https://github.com/user-attachments/assets/6ef4a5f6-a35e-43d6-ad99-67d014b29dd6" />
+
 
 #### 3.4 ปรับแต่ง WAL Buffers
 ```sql
@@ -338,9 +341,9 @@ docker exec -it postgres-config psql -U postgres
 SHOW wal_buffers;
 ```
 ### ผลการทดลอง
-```
+
 รูปผลการเปลี่ยนแปลงค่า wal_buffers
-```
+<img width="381" height="162" alt="image" src="https://github.com/user-attachments/assets/650da7d6-98fc-43e6-b7f6-35d69903a192" />
 
 #### 3.5 ปรับแต่ง Effective Cache Size
 ```sql
@@ -355,13 +358,11 @@ SELECT pg_reload_conf();
 SHOW effective_cache_size;
 ```
 ### ผลการทดลอง
-```
+
 รูปผลการเปลี่ยนแปลงค่า effective_cache_size
-```
+<img width="494" height="172" alt="image" src="https://github.com/user-attachments/assets/6e28deb4-6e02-4824-ae6b-e1ef281e88d5" />
 
 ### Step 4: ตรวจสอบผล
-
-
 ```sql
 -- สร้างรายงานการตั้งค่า
 SELECT 
@@ -384,9 +385,10 @@ WHERE name IN (
 ORDER BY name;
 ```
 ### ผลการทดลอง
-```
+
 รูปผลการลัพธ์การตั้งค่า
-```
+<img width="1706" height="438" alt="image" src="https://github.com/user-attachments/assets/d0d58d31-9eb3-4951-ad0a-490bf3c0bfab" />
+
 
 ### Step 5: การสร้างและทดสอบ Workload
 
@@ -415,7 +417,7 @@ CREATE INDEX idx_large_table_created_at ON large_table(created_at);
 #### 5.2 การทดสอบ Work Memory
 ```sql
 -- แทรกข้อมูลจำนวนมาก (ทดสอบ work_mem)
-INSERT INTO large_table (data, number) 
+INSERT INTO large_table (data, number);
 SELECT 
     'Test data for performance ' || i,
     (random() * 1000000)::integer
