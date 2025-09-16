@@ -193,9 +193,10 @@ docker exec postgres-config df -h
    ตอบ docker exec postgres-config free: ดูการใช้ RAM ใน container
         docker exec postgres-config df: ดูการใช้พื้นที่ดิสก์ใน container
    
-3. option -h ในคำสั่งมีผลอย่างไร
+2. option -h ในคำสั่งมีผลอย่างไร
    ตอบ แสดงผลแบบอ่านง่าย เช่น MB/GB แทนตัวเลขดิบ
-5. docker exec postgres-config nproc  แสดงค่าผลลัพธ์อย่างไร
+   
+4. docker exec postgres-config nproc  แสดงค่าผลลัพธ์อย่างไร
 <img width="700" height="134" alt="image" src="https://github.com/user-attachments/assets/b27e7d1d-5e10-423e-88ae-1410dbde4c34" />
 
 #### 1.2 เชื่อมต่อและตรวจสอบสถานะปัจจุบัน
@@ -248,8 +249,10 @@ WHERE name = 'shared_buffers';
 
 1.รูปผลการรันคำสั่ง
 <img width="903" height="315" alt="image" src="https://github.com/user-attachments/assets/ae2469a4-f38a-4ba1-952c-e3e5991e0222" />
+
 2. ค่า  shared_buffers มีการกำหนดค่าไว้เท่าไหร่ (ใช้ setting X unit)
     ตอบ ค่า shared_buffers = 16384 × 8kB = 131072kB หรือ 128MB ใช้สำหรับกำหนดขนาดหน่วยความจำที่ PostgreSQL ใช้เก็บข้อมูลในแคช
+   
 3. ค่า  pending_restart ในผลการทดลองมีค่าเป็นอย่างไร และมีความหมายอย่างไร
     ตอบ ค่า pending_restart = f (false) หมายความว่า ไม่จำเป็นต้อง restart PostgreSQL เพื่อให้ค่าการตั้งค่านี้มีผล เพราะค่าถูกโหลดแล้วจากไฟล์ config
     
