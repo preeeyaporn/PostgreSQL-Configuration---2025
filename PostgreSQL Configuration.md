@@ -430,11 +430,17 @@ ORDER BY data
 LIMIT 1000;
 ```
 ### ผลการทดลอง
-```
-1. คำสั่ง EXPLAIN(ANALYZE,BUFFERS) คืออะไร 
+
+1. คำสั่ง EXPLAIN(ANALYZE,BUFFERS) คืออะไร
+   ตอบ EXPLAIN (ANALYZE, BUFFERS) ใช้ดูแผนการทำงานของ SQL พร้อมรันจริงและรายงานเวลาที่ใช้ รวมถึงข้อมูลการเข้าถึงหน่วยความจำและดิสก์ เพื่อช่วยวิเคราะห์ประสิทธิภาพของคำสั่ง
+
 2. รูปผลการรัน
+   <img width="1889" height="555" alt="image" src="https://github.com/user-attachments/assets/ee94fb86-a782-44c3-9a93-6102895b0d5c" />
+
 3. อธิบายผลลัพธ์ที่ได้
-```
+   ตอบ PostgreSQL ใช้ Parallel Seq Scan พร้อม worker 2 ตัวเพื่ออ่านข้อมูลจาก large_table อย่างรวดเร็ว จากนั้น Sort ด้วย top-N heapsort โดยใช้ RAM เพียงพอ (176–231 kB ต่อ process) ไม่เกิดการ spill ลงดิสก์ แสดงว่า work_mem เหมาะสม แล้วใช้ Gather Merge รวมผลลัพธ์และส่งออก 1000 แถวตาม LIMIT ใช้เวลา ~119 ms ถือว่ามีประสิทธิภาพมากสำหรับข้อมูลขนาดใหญ่.
+
+
 ```sql
 -- ทดสอบ Hash operation
 EXPLAIN (ANALYZE, BUFFERS)
@@ -446,11 +452,22 @@ LIMIT 100;
 ```
 
 ### ผลการทดลอง
-```
 1. รูปผลการรัน
-2. อธิบายผลลัพธ์ที่ได้ 
+   <img width="1213" height="258" alt="image" src="https://github.com/user-attachments/assets/c634b96e-2c8f-4863-a630-3c5b0c8f7faf" />
+
+2. อธิบายผลลัพธ์ที่ได้
+   ตอบ ใช้ Index Only Scan อ่านข้อมูลจากดัชนีโดยตรง (actual rows=5777, shared hit=6)
+           - GroupAggregate รวมกลุ่มตาม number และกรองด้วย HAVING count(*) > 1 (ตัดทิ้ง 354 กลุ่ม)
+           - Limit 100 หยุดเมื่อได้ผลลัพธ์ครบ → ลดภาระการประมวลผล
+           - ไม่ใช้ Sort/Hash หรือ temp I/O → เร็วมาก (Execution 0.362 ms)
+
 3. การสแกนเป็นแบบใด เกิดจากเหตุผลใด
-```
+  ตอบ ชนิดการสแกน: Index Only Scan
+        - ดัชนีมีข้อมูลครบที่ต้องใช้
+        - ดัชนีจัดเรียงตาม number → ใช้ GroupAggregate ได้ทันที
+        - หน้าเพจถูก mark all-visible → ไม่ต้อง fetch heap
+        - มี LIMIT → อ่านเท่าที่จำเป็นแล้วหยุดเร็
+
 #### 5.3 การทดสอบ Maintenance Work Memory
 ```sql
 -- ทดสอบ CREATE INDEX (จะใช้ maintenance_work_mem)
@@ -465,10 +482,13 @@ DELETE FROM large_table WHERE id % 10 = 0;
 VACUUM (ANALYZE, VERBOSE) large_table;
 ```
 ### ผลการทดลอง
-```
+
 1. รูปผลการทดลอง จากคำสั่ง VACUUM (ANALYZE, VERBOSE) large_table;
+   <img width="1237" height="555" alt="image" src="https://github.com/user-attachments/assets/ab43c1ca-f2d0-4e6d-ab2a-8f9d632ed051" />
+
 2. อธิบายผลลัพธ์ที่ได้
-```
+   ตอบ สรุปสั้น ๆ: VACUUM (ANALYZE, VERBOSE) ลบ dead tuples 50,000 แถวจาก large_table เหลือ 450,000 แถวจริง ตรวจสอบ index แล้วไม่มี tuple ค้าง ใช้ parallel workers 2 ตัวช่วยเร่งความเร็ว และมีการ ANALYZE เพื่ออัปเดตสถิติให้ Query Planner วางแผนได้แม่นยำ
+
 ### Step 6: การติดตาม Memory Usage
 
 #### 6.1 สร้างฟังก์ชันติดตาม Memory
@@ -509,9 +529,10 @@ SELECT
 FROM get_memory_usage();
 ```
 ### ผลการทดลอง
-```
+
 รูปผลการทดลอง
-```
+<img width="1097" height="333" alt="image" src="https://github.com/user-attachments/assets/32db7a86-d6e0-42c2-8936-f827069ff9d8" />
+
 
 #### 6.2 การติดตาม Buffer Hit Ratio
 ```sql
@@ -530,10 +551,13 @@ WHERE heap_blks_read + heap_blks_hit > 0
 ORDER BY heap_blks_read + heap_blks_hit DESC;
 ```
 ### ผลการทดลอง
-```
+
 1. รูปผลการทดลอง
+   <img width="1260" height="114" alt="image" src="https://github.com/user-attachments/assets/c51e2489-5b9f-42ea-87b0-d1c0e53d6a81" />
+
 2. อธิบายผลลัพธ์ที่ได้
-```
+  ตอบ ตาราง large_table ถูก cache ไว้ในหน่วยความจำทั้งหมด (shared buffers) → เข้าถึงข้อมูล ~620k ครั้ง โดยไม่อ่านจากดิสก์เลย (heap_blks_read = 0) → hit ratio = 100% → ประสิทธิภาพสูงสุด
+
 #### 6.3 ดู Buffer Hit Ratio ทั้งระบบ
 ```sql
 SELECT datname,
@@ -544,10 +568,13 @@ FROM pg_stat_database
 WHERE datname = current_database();
 ```
 ### ผลการทดลอง
-```
+
 1. รูปผลการทดลอง
+<img width="843" height="123" alt="image" src="https://github.com/user-attachments/assets/1fde7c2e-ebfa-4f1c-a17a-69370e259f3c" />
+
 2. อธิบายผลลัพธ์ที่ได้
-```
+  ตอบ ผลลัพธ์ว่าง (0 rows) หมายถึงไม่มีตารางที่ตรงเงื่อนไข หรือยังไม่มีการเข้าถึงตารางนั้นเลย → จึงไม่มีสถิติ cache เช่น heap_blks_read หรือ heap_blks_hit ให้แสดง
+
 
 #### 6.4 ดู Table ที่มี Disk I/O มาก
 ```sql
@@ -565,10 +592,12 @@ ORDER BY heap_blks_read DESC
 LIMIT 10;
 ```
 ### ผลการทดลอง
-```
+
 1. รูปผลการทดลอง
+   <img width="1527" height="97" alt="image" src="https://github.com/user-attachments/assets/aef52b78-4497-41e8-90ad-5172c15696b0" />
+
 2. อธิบายผลลัพธ์ที่ได้
-```
+
 ### Step 7: การปรับแต่ง Autovacuum
 
 #### 7.1 ทำความเข้าใจ Autovacuum Parameters
@@ -580,10 +609,21 @@ WHERE name LIKE '%autovacuum%'
 ORDER BY name;
 ```
 ### ผลการทดลอง
-```
+
 1. รูปผลการทดลอง
+   <img width="1919" height="820" alt="image" src="https://github.com/user-attachments/assets/e51cddea-6372-405f-8933-38be9994dfcd" />
+
 2. อธิบายค่าต่าง ๆ ที่มีความสำคัญ
-```
+   ตอบ สรุปค่าที่สำคัญของ autovacuum:
+- เปิดใช้งาน: autovacuum = on
+- จำนวน worker สูงสุด: autovacuum_max_workers = 3
+- พักระหว่างรอบ: autovacuum_naptime = 45s
+- เงื่อนไข vacuum: เปลี่ยน ≥15% หรือ ≥50 แถว
+- เงื่อนไข analyze: เปลี่ยน ≥5% หรือ ≥50 แถว
+- ป้องกัน wraparound: freeze เมื่อ XID ≥ 200 ล้าน / MultiXact ≥ 400 ล้าน
+- หน่วยความจำต่อ process: autovacuum_work_mem = 512MB
+- เขียน log ถ้าเกิน: 10 นาที (log_autovacuum_min_duration = 600000ms)
+
 
 #### 7.2 การปรับแต่ง Autovacuum สำหรับประสิทธิภาพ
 ```sql
@@ -610,9 +650,9 @@ ALTER SYSTEM SET autovacuum_work_mem = '512MB';
 SELECT pg_reload_conf();
 ```
 ### ผลการทดลอง
-```
+
 รูปผลการทดลองการปรับแต่ง Autovacuum (Capture รวมทั้งหมด 1 รูป)
-```
+<img width="593" height="142" alt="image" src="https://github.com/user-attachments/assets/694ccccd-9e88-4f20-b407-f8657c103293" />
 
 ### Step 8: Performance Testing และ Benchmarking
 
@@ -685,11 +725,16 @@ FROM performance_results
 ORDER BY test_timestamp DESC;
 ```
 ### ผลการทดลอง
-```
-1. รูปผลการทดลอง
-2. อธิบายผลลัพธ์ที่ได้
-```
 
+1. รูปผลการทดลอง
+   <img width="825" height="88" alt="image" src="https://github.com/user-attachments/assets/20ab992e-5854-4ab7-8d4b-88142d413a29" />
+
+2. อธิบายผลลัพธ์ที่ได้
+  ตอบ - test_name: ชื่อของชุดทดสอบหรือกรณีทดสอบที่รัน
+      - config_set: ชุดการตั้งค่าหรือพารามิเตอร์ที่ใช้ในการรันแต่ละ test (เช่น database config, memory limit ฯลฯ)
+      - execution_time_ms: เวลาที่ใช้ในการรัน test นั้น ๆ หน่วยเป็นมิลลิวินาที
+      - avg_time: เวลาเฉลี่ยของการรัน test นั้น (อาจมาจากการรันหลายรอบ)
+      - ใช้เพื่อเปรียบเทียบประสิทธิภาพของแต่ละ config/test ได้อย่างชัดเจน
 
 ### Step 9: การ Monitoring และ Alerting
 
@@ -722,9 +767,10 @@ FROM pg_settings WHERE name = 'maintenance_work_mem';
 SELECT * FROM memory_monitor;
 ```
 ### ผลการทดลอง
-```
+
 รูปผลการทดลอง
-```
+<img width="1056" height="205" alt="image" src="https://github.com/user-attachments/assets/7bae03bd-a1d4-4866-832f-6bd01c8ab0f4" />
+
 
 ### Step 10: การจำลอง Load Testing
 
@@ -950,21 +996,26 @@ SELECT * FROM simulate_oltp_workload(25);
 ### ผลการทดลอง
 ```
 รูปผลการทดลอง
-```
+<img width="1263" height="262" alt="image" src="https://github.com/user-attachments/assets/acc011c4-19b1-4257-a200-43e0625b9f7a" />
+
 -- ทดสอบปานกลาง  
 SELECT * FROM simulate_oltp_workload(100);
 ### ผลการทดลอง
-```
+
 1. รูปผลการทดลอง
+<img width="1275" height="255" alt="image" src="https://github.com/user-attachments/assets/fefe77bc-9635-431a-b280-95865de09a99" />
+
 2. อธิบายผลการทดลอง การ SELECT , INSERT, UPDATE, DELETE เป็นอย่างไร 
-```
+  ตอบ SELECT/INSERT เร็วมาก (avg ~0.03 ms) เพราะใช้ cache/disk น้อย
+UPDATE ช้ากว่า (~97 ms) เพราะสร้าง dead tuple
+DELETE (soft) ช้าที่สุด (~124 ms) เพราะอัปเดตหลายคอลัมน์คล้าย UPDATE แต่แพงกว่า
 
 -- ทดสอบหนักขึ้น เครื่องใครไม่ไหวผ่านก่อน หรือเปลี่ยนค่า 500 เป็น 200 :)
 SELECT * FROM simulate_oltp_workload(500);
 ### ผลการทดลอง
-```
 รูปผลการทดลอง
-```
+<img width="1255" height="321" alt="image" src="https://github.com/user-attachments/assets/610e8af1-c0ce-4662-8128-4009123dba9b" />
+
 
 ### Step 11: การเปรียบเทียบประสิทธิภาพ
 
@@ -1157,9 +1208,9 @@ $$ LANGUAGE plpgsql;
 SELECT * FROM run_benchmark_suite();
 ```
 ### ผลการทดลอง
-```
+
 รูปผลการทดลอง
-```
+<img width="1234" height="326" alt="image" src="https://github.com/user-attachments/assets/e83c4fd0-02af-42ea-b60e-2068534b7fa1" />
 
 -- ดูผลการทดสอบ
 SELECT 
