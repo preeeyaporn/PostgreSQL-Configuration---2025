@@ -817,9 +817,8 @@ CREATE INDEX idx_orders_product_id ON load_test_orders(product_id);
 CREATE INDEX idx_orders_date ON load_test_orders(order_date);
 ```
 ### ผลการทดลอง
-```
 รูปผลการทดลอง การสร้าง FUNCTION และ INDEX
-```
+<img width="391" height="371" alt="image" src="https://github.com/user-attachments/assets/923cc060-04a7-454b-a068-e594b6b6bda9" />
 
 #### 10.2 การทดสอบ Query Performance
 ```sql
@@ -1225,9 +1224,9 @@ FROM benchmark_results
 ORDER BY test_timestamp DESC;
 ```
 ### ผลการทดลอง
-```
+
 รูปผลการทดลอง
-```
+<img width="1155" height="182" alt="image" src="https://github.com/user-attachments/assets/50c203d8-6298-4913-955d-f38561459d06" />
 
 ### Step 12: การจัดการ Configuration แบบ Advanced
 
@@ -1494,7 +1493,8 @@ SELECT auto_tune_memory();
 ### ผลการทดลอง
 ```
 รูปผลการทดลอง
-```
+<img width="1158" height="376" alt="image" src="https://github.com/user-attachments/assets/a959a375-a687-4754-a198-f7ce6285e809" />
+
 ```sql
 -- ดูการเปลี่ยนแปลง buffer hit ratio
 SELECT 
@@ -1507,9 +1507,10 @@ WHERE heap_blks_read + heap_blks_hit > 0
 ORDER BY hit_ratio;
 ```
 ### ผลการทดลอง
-```
+
 รูปผลการทดลอง
-```
+<img width="768" height="257" alt="image" src="https://github.com/user-attachments/assets/d14f8303-e510-4578-b65b-4c6cc36770fc" />
+
 
 ### การคำนวณ Memory Requirements
 
@@ -1541,9 +1542,35 @@ Estimated Usage = 2GB + (32MB × 100 × 0.5) + 512MB + 64MB
 
 ## คำถามท้ายการทดลอง
 1. หน่วยความจำใดบ้างที่เป็น shared memory และมีหลักในการตั้งค่าอย่างไร
+   ตอบ  - shared_buffers: ใช้ร่วมกันทุก connection
+         - ตั้งค่า ≈ 25–40% ของ RA
+
 2. Work memory และ maintenance work memory คืออะไร มีหลักการในการกำหนดค่าอย่างไร
+  ตอบ - work_mem: ใช้ต่อ query เช่น sort/join
+    - maintenance_work_mem: ใช้ตอน VACUUM/CREATE INDEX
+    - ตั้งค่า: work_mem ≈ 4–128MB, maintenance ≈ 128–1024M
+
 3. หากมี RAM 16GB และต้องการกำหนด connection = 200 ควรกำหนดค่า work memory และ maintenance work memory อย่างไร
+   ตอบ   - shared_buffers = 4GB
+         - maintenance_work_mem = 512MB
+         - work_mem ≈ 128–256MB (ขึ้นกับ active query
 4. ไฟล์ postgresql.conf และ postgresql.auto.conf  มีความสัมพันธ์กันอย่างไร
+   ตอบ - auto.conf ถูกสร้างจาก ALTER SYSTEM
+        - มี priority สูงกว่า conf ปก
 5. Buffer hit ratio คืออะไร
+   ตอบ  - วัดการอ่านจาก memory vs disk
+        - ควร > 99% เพื่อประสิทธิภาพสู
+
 6. แสดงผลการคำนวณ การกำหนดค่าหน่วยความจำต่าง ๆ โดยอ้างอิงเครื่องของตนเอง
+   ตอบ  - shared_buffers = 4GB
+        - work_mem = 128MB
+        - maintenance_work_mem = 512MB
+        - effective_cache_size = 8G
+
 7. การสแกนของฐานข้อมูล PostgreSQL มีกี่แบบอะไรบ้าง เปรียบเทียบการสแกนแต่ละแบบ
+   ตอบ   - Sequential Scan: อ่านทุกแถว
+         - Index Scan: ใช้ index
+         - Index Only Scan: อ่านจาก index อย่างเดียว
+         - Bitmap Scan: ใช้หลาย index รวมกัน
+
+
